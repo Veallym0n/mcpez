@@ -86,6 +86,21 @@ MCPez 是一个基于 Web 的管理平台，旨在简化后端服务（如 AI �
 
 在浏览器中打开 `http://localhost:8088` (或您指定的主机端口)。
 
+
+![alt text](imgs/image.png)
+
+
+![alt text](imgs/image-1.png)
+
+
+![alt text](imgs/image-2.png)
+
+
+![alt text](imgs/image-3.png)
+
+
+![alt text](imgs/image-4.png)
+
 ### 使用说明
 
 1.  **服务管理 (`index.html`)**:
