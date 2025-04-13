@@ -1,0 +1,851 @@
+<!DOCTYPE html>
+<html lang="zh-CN" class="scroll-smooth overflow-hidden">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="mobile-web-app-capable" content="yes">
+  <title>Playground/toai.chat</title>
+  
+  <!-- 引入UIKit和TailwindCSS -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/uikit@3.16.19/dist/css/uikit.min.css" />
+  <script src="https://cdn.jsdelivr.net/npm/uikit@3.16.19/dist/js/uikit.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/uikit@3.16.19/dist/js/uikit-icons.min.js"></script>
+
+  <!-- 引入marked和highlight.js -->
+  <script src="https://cdn.jsdelivr.net/npm/marked@15.0.8/lib/marked.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/marked-highlight@2.2.1/lib/index.umd.min.js"></script>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/github-markdown-css/github-markdown.css" id="markdown-light">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/github-markdown-css@5.8.1/github-markdown-dark.css" id="markdown-dark" disabled>
+
+  <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/highlight.min.js"></script>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/styles/a11y-light.min.css" id="code-light">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/styles/a11y-dark.min.css" id="code-dark" disabled>
+
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.css" id="mermaid-light">
+  <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
+
+  <script src="https://cdn.tailwindcss.com"></script>
+  
+  <script src="libs/ai/ai.js"></script>
+  <script src="libs/mcpcli.js"></script>
+  
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            'ai-green': '#10a37f',
+            'ai-green-dark': '#0e8a6e',
+            'chat-bg': '#f7f7f8',
+            'chat-dark': '#444654',
+            'text-light': '#222222',
+            'text-dark': '#ececf1',
+            'user-bg': '#eeeeee'
+          },
+          boxShadow: {
+            'send-btn': '0 2px 5px rgba(0,0,0,0.1)'
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    .markdown-body { background-color: transparent; h-* { color: #eee; } }
+    ::-webkit-scrollbar { width: 0px; }
+  </style>
+</head>
+<body class="dark:bg-gray-900 dark:text-gray-100">
+  <!-- 添加UIKit Offcanvas组件作为左侧抽屉 -->
+  <div id="offcanvas-nav" uk-offcanvas="overlay: true; mode: push">
+    <div class="uk-offcanvas-bar bg-gray-50 text-gray-600 dark:bg-gray-600 dark:text-gray-100">
+      <button class="uk-offcanvas-close" type="button" uk-close></button>
+      <div class="font-bold text-lg text-gray-800 dark:text-gray-100 mb-4">Topic History</div>
+      
+      <!-- 改为黑白配色的新对话按钮 -->
+      <div class="flex items-center justify-center mx-4 my-3 p-2.5 rounded bg-gray-500 text-white cursor-pointer transition-colors" id="new-chat-btn">
+        <span uk-icon="icon: plus" class="text-white"></span>
+        <span class="ml-2 text-sm font-medium">New Topic</span>
+      </div>
+      
+      <div class="conversation-list mt-4" id="conversation-list"></div>
+    </div>
+  </div>
+
+
+  <div id="app" class="flex flex-col h-screen">
+    <!-- 顶部导航栏 - 固定定位 -->
+    <header class="fixed top-0 left-0 w-full bg-white dark:bg-gray-900 z-40">
+      <div class="uk-container uk-container-expand">
+        <nav class="uk-navbar" uk-navbar>
+          <div class="uk-navbar-left">
+            <!-- 添加菜单按钮 -->
+            <a class="uk-navbar-toggle" href="#" uk-toggle="target: #offcanvas-nav">
+              <span uk-icon="icon: menu"></span>
+            </a>
+            <!-- 将固定标题改为可编辑区域 -->
+            <div class="uk-navbar-item dark:text-gray-100">
+              <span id="conversation-title" contenteditable="true"></span>
+            </div>
+          </div>
+          <div class="uk-navbar-right">
+            <ul class="uk-navbar-nav">
+              <li>
+                <a href="#" id="theme-toggle" class="theme-icon flex items-center justify-center dark:text-gray-100">
+                  <svg id="icon-moon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-5">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M21.752 15.002A9.72 9.72 0 0 1 18 15.75c-5.385 0-9.75-4.365-9.75-9.75 0-1.33.266-2.597.748-3.752A9.753 9.753 0 0 0 3 11.25C3 16.635 7.365 21 12.75 21a9.753 9.753 0 0 0 9.002-5.998Z" />
+                  </svg>
+                </a>
+              </li>
+              <li>
+                <a href="#" uk-icon="icon: cog"></a>
+                <div class="uk-navbar-dropdown" uk-dropdown="mode: click; animation: uk-animation-slide-top-small; duration: 100">
+                  <ul class="uk-nav uk-navbar-dropdown-nav line-height-2">
+                    <li style="margin:16px;"><a id="clear-chat" uk-icon="icon: refresh">清空记录</a></li>
+                    <li style="margin:16px;"><a id="remove-chat" uk-icon="icon: trash">删除对话</a></li>
+                    <li style="margin:16px;"><a id="api-settings" uk-icon="icon: cog">对话设置</a></li>
+                  </ul>
+                </div>
+              </li>
+            </ul>
+          </div>
+        </nav>
+      </div>
+    </header>
+    
+    <!-- 聊天区域 - 调整顶部边距以避免被固定header覆盖 -->
+    <main class="flex-grow pt-[80px] overflow-y-auto">
+      <div class="uk-container uk-container-expand h-full">
+        <div id="chat-container" class="chat-container flex flex-col mb-2.5 p-5 pb-[240px]"></div>
+      </div>
+    </main>
+    
+    <div class="fixed bottom-0 left-0 w-full bg-white dark:bg-gray-900 p-4 border-gray-200 dark:border-gray-700 z-30 shadow-md">
+
+        <div class="message-toolbar uk-margin-small-bottom flex items-center gap-8 px-4">
+
+            <div class="uk-inline">
+                <div class="js-upload cursor-hand" uk-form-custom>
+                    <button class="toolbar-btn" type="button" uk-tooltip="上传文件">
+                        <span uk-icon="icon: image"></span>
+                        <input type="file" id="image-upload-input" accept="image/*" multiple>
+                    </button>
+
+                </div>
+            </div>
+            
+            <div class="uk-inline">
+              <button class="toolbar-btn" id="mcp-toggle" uk-tooltip="MCP">
+                <span uk-icon><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-6">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="m21 7.5-9-5.25L3 7.5m18 0-9 5.25m9-5.25v9l-9 5.25M3 7.5l9 5.25M3 7.5v9l9 5.25m0-9v9" />
+                </svg>
+                </span>      
+
+                          
+              </button>
+            </div>
+        
+        </div>
+
+        <div class="flex items-start gap-2.5 relative mx-auto my-0">
+          <textarea id="message-input"  class="rounded-lg p-3 resize-none overflow-y-auto max-h-[120px] flex-grow shadow-sm border border-gray-200 transition-all focus:shadow-md focus:border-blue-400  dark:focus:border-blue-200 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-100 uk-textarea h-[48px]" rows="1" placeholder="输入信息..." style="overflow:hidden"></textarea>
+          
+          <!-- 重写发送按钮，添加两种状态 -->
+          <button id="send-button" class="w-10 h-10 rounded-full bg-ai-green text-white flex items-center justify-center cursor-pointer border-0 shadow-md transition-all duration-300 ease-in-out flex-shrink-0 mt-1.5 disabled:bg-gray-300 disabled:cursor-not-allowed" disabled>
+            <!-- 正常状态 -->
+            <span id="send-icon" class="block">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                <path fill-rule="evenodd" d="M10.293 5.293a1 1 0 011.414 0l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414-1.414L12.586 11H5a1 1 0 110-2h7.586l-2.293-2.293a1 1 0 010-1.414z" clip-rule="evenodd" />
+              </svg>
+            </span>
+            <!-- loading状态 -->
+            <span id="loading-icon" class="hidden">
+              <svg class="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              </svg>
+            </span>
+          </button>
+        </div>
+
+        <div id="image-preview-container" class="flex flex-wrap gap-2.5 mt-2.5">
+            <ul class="uk-thumbnav" uk-margin id="image-preview-container"></ul>
+        </div>
+    </div>
+
+  </div>
+  
+  <div id="settings-modal" uk-modal>
+    <div class="uk-modal-dialog uk-modal-body">
+      <h2 class="uk-modal-title">对话设置</h2>
+      <form class="uk-form-stacked">
+        <div class="uk-margin">
+          <label class="uk-form-label">API Key</label>
+          <div class="uk-form-controls"><input class="uk-input" id="apiKey" type="password" placeholder="输入你的API Key"></div>
+        </div>
+        <div class="uk-margin">
+            <label class="uk-form-label">MCP(SSE)</label>
+            <div class="uk-form-controls"><input class="uk-input" id="mcp" type="text" placeholder="请输入MCP服务器地址"></div>
+          </div>        
+        <div class="uk-margin">
+          <label class="uk-form-label">API baseURL</label>
+          <div class="uk-form-controls"><input class="uk-input" id="baseURL" type="text" placeholder="https://porky.toai.chat/pollination/v1"></div>
+        </div>
+        <div class="uk-margin">
+          <label class="uk-form-label">模型</label>
+          <div class="uk-form-controls">
+            <input class="uk-input" id="model" type="text" placeholder="模型名称" value="openai">
+          </div>
+          <a href="https://text.pollinations.ai/models" target="_blank">see the models if you are using pollinations</a>
+        </div>
+        <div class="uk-margin">
+          <label class="uk-form-label">系统提示 (System Prompt)</label>
+          <div class="uk-form-controls">
+            <textarea class="uk-textarea" id="systemPrompt" rows="3" placeholder="输入系统提示，指导AI的行为和角色"></textarea>
+          </div>
+        </div>
+        <div class="uk-margin">
+          <label class="uk-form-label">温度 <span id="temperature-value">0.7</span></label>
+          <div class="uk-form-controls"><input class="uk-range" id="temperature" type="range" min="0" max="2" step="0.01" value="0.7"></div>
+        </div>
+        <div class="uk-margin">
+          <label class="uk-form-label">最大令牌数 (Max Tokens)</label>
+          <div class="uk-form-controls">
+            <input class="uk-input" id="maxTokens" type="number" placeholder="最大令牌数" value="128000">
+          </div>
+        </div>
+        <div class="uk-margin">
+          <label class="uk-form-label">Top P <span id="top-p-value">1.0</span></label>
+          <div class="uk-form-controls"><input class="uk-range" id="topP" type="range" min="0" max="1" step="0.01" value="1.0"></div>
+        </div>
+      </form>
+      <div class="uk-text-right">
+        <button class="uk-button uk-button-default uk-modal-close rounded-md">取消</button>
+        <button class="uk-button uk-button-primary rounded-md" id="save-settings">保存</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+
+    const appState = {
+      darkMode: localStorage.getItem('darkMode') === 'true',
+      currentChat: null,
+
+      togglekMode() {
+        this.darkMode = !this.darkMode;
+        localStorage.setItem('darkMode', this.darkMode);
+        document.documentElement.classList.toggle('dark')
+        document.getElementById('markdown-light').disabled = this.darkMode;
+        document.getElementById('markdown-dark').disabled = !this.darkMode;
+        document.getElementById('code-light').disabled = this.darkMode;
+        document.getElementById('code-dark').disabled = !this.darkMode;
+      }
+
+    }
+
+    document.getElementById('theme-toggle').addEventListener('click', appState.togglekMode)
+    mermaid.initialize({startOnLoad:true, theme: appState.darkMode ? 'neutral' : 'neutral', securityLevel: 'loose'});
+
+
+    class DataBase {
+      constructor(dbname, structure={}) {
+        this.dbName = dbname
+        this.structure = structure;
+        this.db = null;
+        this.ready = this.initDatabase();
+      }
+
+      async initDatabase() {
+        return new Promise((resolve, reject) => {
+          const request = indexedDB.open(this.dbName, 1);
+          
+          request.onupgradeneeded = (event) => {
+            const db = event.target.result;
+            for (const storeName in this.structure) {
+              if (!db.objectStoreNames.contains(storeName)) {
+                const store = db.createObjectStore(storeName, { keyPath: this.structure[storeName].keyPath });
+                for (const index of this.structure[storeName].indexes) {
+                  store.createIndex(index.name, index.keyPath, { unique: index.unique||false });
+                }
+              }
+            }
+          };
+    
+          request.onsuccess = (event) => { this.db = event.target.result; resolve(true);};
+          request.onerror = (event) => { reject(event.target.error);};
+        });
+      }
+
+      async getCollectionData(collection, key, filter) {
+        await this.ready;
+        return new Promise((resolve, reject) => {
+          const transaction = this.db.transaction([collection], 'readonly');
+          const store = transaction.objectStore(collection);
+          const index = store.index(key);
+          const request = !filter ? index.getAll() : index.getAll(filter);
+          request.onsuccess = () => resolve(request.result);
+          request.onerror = () => reject(request.error);
+        });
+      }
+
+      async setCollectionData(collection, data) {
+        await this.ready;
+        return new Promise((resolve, reject) => {
+          const transaction = this.db.transaction([collection], 'readwrite');
+          const store = transaction.objectStore(collection);
+          const request = store.put(data);
+          request.onsuccess = () => resolve(request.result);
+          request.onerror = () => reject(request.error);
+        });
+      }
+
+      async deleteCollectionData(collection, key) {
+        await this.ready;
+        return new Promise((resolve, reject) => {
+          const transaction = this.db.transaction([collection], 'readwrite');
+          const store = transaction.objectStore(collection);
+          const request = store.delete(key);
+          request.onsuccess = () => resolve(request.result);
+          request.onerror = () => reject(request.error);
+        });
+      }
+    }
+      
+    class MainDatabase extends DataBase {
+        constructor() {
+          super('MainDB', {
+            conversations: {
+              keyPath: 'id',
+              indexes: [
+                { name: 'title', keyPath: 'title' },
+                { name: 'lastMessage', keyPath: 'lastMessage' },
+                { name: 'id', keyPath: 'id' },
+                { name: 'timestamp', keyPath: 'timestamp' }
+              ]
+            }
+          });
+        }
+        async getAllConversations(id=null) {
+          if (id) return await this.getCollectionData('conversations', 'id', id);
+          return await this.getCollectionData('conversations', 'timestamp');
+        }
+        async getOrCreateLastChat() {
+          const conversations = await this.getAllConversations();
+          if (conversations.length > 0) {
+            const conversation = conversations[conversations.length - 1];
+            console.log('获取最后一个对话:', conversation);
+            return conversation;
+          }
+          return this.createNewConversation(Date.now(), '');
+        }
+        async createNewConversation(id, title) {
+          const conversation = { id: id, title: title,timestamp: Date.now(), lastMessage: ''};
+          await this.setCollectionData('conversations', conversation);
+          return conversation;
+        }
+      }
+
+    class ChatDatabase extends DataBase {
+      constructor(chatId) {
+        if(!chatId) {
+          debugger;
+          throw new Error('Chat ID is required');
+        }
+        super(`ChatDB-${chatId}`, {
+          messages: {
+            keyPath: 'id',
+            indexes: [
+              { name: 'id', keyPath: 'id' },
+              { name: 'content', keyPath: 'content' },
+              { name: 'role', keyPath: 'role' },
+              { name: 'timestamp', keyPath: 'timestamp' },
+              { name: 'images', keyPath: 'images' }
+            ]
+          },
+          settings: {
+            keyPath: 'key',
+            indexes: [
+              { name: 'key', keyPath: 'key' },
+              { name: 'value', keyPath: 'value' }
+            ]
+          }
+        });
+      }
+      async getSettings() {return await this.getCollectionData('settings', 'key')}
+      async saveMessage(message) { await this.setCollectionData('messages', message)}
+      async getAllMessages() { return await this.getCollectionData('messages', 'timestamp') }
+    }
+
+    window.MainDatabase = new MainDatabase()
+
+
+    class AdvancedConversation {
+      constructor() {
+        this.db = window.MainDatabase
+        this.conversationList = document.getElementById('conversation-list');
+        this.newChatButton = document.getElementById('new-chat-btn');
+        this.deleteChatButton = document.getElementById('remove-chat');
+        this.topicTitle = document.getElementById('conversation-title');
+        this.init();
+      }
+      async init() {
+        this.newChatButton.addEventListener('click', this.createNewConversation.bind(this));
+        await this.loadConversations();
+        this.deleteChatButton.addEventListener('click', this.deleteConversation.bind(this));
+        this.topicTitle.addEventListener('blur', async (e) => {
+          const title = e.target.innerText;
+          if (title) { await this.setConversationTitle(window.aiui.chatId, title);}
+        });
+        this.topicTitle.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter') { e.preventDefault(); this.topicTitle.blur();}
+        });
+      }
+      async loadConversations() {
+        const conversations = await this.db.getAllConversations();
+        this.conversationList.innerHTML = ''; // 清空列表
+        for (const conversation of conversations) {
+          const item = document.createElement('div');
+          item.className = 'conversation-item flex items-center justify-between p-2 rounded-lg cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors';
+          item.id = 'conversation-' + conversation.id;
+          item.setAttribute('data-id', conversation.id);
+          const title = document.createElement('span')
+          title.className = 'conversation-title truncate whitespace-nowrap'; title.innerText = conversation.title || 'Untitled Topic';
+          item.appendChild(title);
+          item.addEventListener('click', (e) => {this.loadConversation(conversation.id);});
+          this.conversationList.appendChild(item);
+        }
+      }
+      async createNewConversation() {
+        const chat = await this.db.createNewConversation(Date.now(), '');
+        await this.loadConversations();
+        await this.loadConversation(chat.id);
+      }
+      async loadConversation(id) {
+        await this.loadConversations()
+        const conversations = await this.db.getAllConversations(id);
+        if (conversations.length > 0) {
+          const conversation = conversations[0];
+          this.conversationList.querySelectorAll('.conversation-item').forEach(item => item.classList.remove('active'));
+          this.conversationList.querySelector(`#conversation-${conversation.id}`).classList.add('active');
+          window.aiui = new AIUI( {chatId: conversation.id} );
+          await window.aiui.ready;
+          this.topicTitle.innerText = conversation.title;
+          UIkit.offcanvas('#offcanvas-nav').hide();
+        }
+      }
+      async deleteConversation(event) {
+        const id = window.aiui.chatId;
+        await UIkit.modal.confirm('确定要删除此对话吗？', {labels: {ok: '删除', cancel: '取消'}}).then(async () => {
+          await this.db.deleteCollectionData('conversations', id);
+          await indexedDB.deleteDatabase(`ChatDB-${id}`);
+          await this.loadConversations();
+          window.aiui = new AIUI();
+        })
+      }
+      async setConversationTitle(id, title) {
+        const conversation = await this.db.getCollectionData('conversations', 'id', id);
+        if (conversation.length > 0) {
+          conversation[0].title = title;
+          await this.db.setCollectionData('conversations', conversation[0]);
+          this.topicTitle.innerText = title;
+        }
+        await this.loadConversations();
+      }
+    }
+
+
+    class AdvancedContainer {
+      // 聊天消息容器类，主要控制chat-container的消息
+      constructor(db) {
+        this.container = document.getElementById('chat-container');
+        this.clearChatButton = document.getElementById('clear-chat');
+        this.container.innerHTML = ''; // 初始化的时候，清空容器
+        this.db = db;
+        this.ready = this.init()
+      }
+
+      async init() {
+        this.clearChatButton.addEventListener('click', async() => {
+          await UIkit.modal.confirm('确定要清空聊天记录吗？', {labels: {ok: '清空', cancel: '取消'}}).then(async () => {
+            await this.clearChat();window.aiui.ai.messages = [];
+          });
+        });
+      }
+
+      scrollToBottom() {
+        // 修改滚动函数，滚动整个窗口到底部
+        window.scrollTo(0, document.body.scrollHeight);
+      }
+      
+      async newMessage(role) {
+        const msgId = `msg-${Date.now()}`;
+        const messageDiv = document.createElement('div');
+        messageDiv.className = 'max-w-fit mb-4 p-3 rounded-lg relative break-words shadow-sm';
+        
+        // 使用Tailwind类替代自定义CSS类
+        if (role === 'user') {
+          messageDiv.classList.add('bg-user-bg', 'text-gray-900', 'ml-auto', 'text-right','uk-animation-slide-bottom-small','uk-animation-fade');
+        } else if (role === 'assistant') {
+          messageDiv.classList.add('bg-chat-bg', 'text-text-light', 'dark:bg-chat-dark', 'dark:text-text-dark','uk-animation-fade','uk-animation-slide-bottom-small');
+        }
+        
+        messageDiv.id = msgId;
+
+        const messageContent = document.createElement('div');
+        messageContent.className = 'message-content';
+        messageContent.setAttribute('raw', '');
+        if (role === 'assistant') {
+            messageContent.setAttribute('class','message-content p-2 markdown-body rounded-md dark:[&>h4]:text-gray-100  dark:[&>h3]:text-gray-100  dark:[&>h2]:text-gray-100  dark:[&>h1]:text-gray-100');
+        }
+
+        const messageReason = document.createElement('div');
+        messageReason.className = 'message-reason';
+        messageReason.setAttribute('raw', '');
+
+        messageDiv.appendChild(messageReason);
+        messageDiv.appendChild(messageContent);
+
+        const add = () => { this.container.appendChild(messageDiv); this.scrollToBottom();};
+        const update = async(content, addons={}) => { 
+          const { scroll=false, images=[], spin=false } = addons;
+          messageContent.setAttribute('raw', content);
+          if (spin) {
+            content = `<div uk-spinner='ratio: 0.5'></div>`;
+          } 
+          if (role === 'user') {
+            messageContent.innerHTML = content;
+            if (images.length) {
+                messageContent.setAttribute('images', JSON.stringify(images));
+                const imgContainer = document.createElement('div'); imgContainer.className = 'flex';
+                images.forEach((image, index) => {
+                    const img = document.createElement('img');
+                    img.src = image; img.style.height = '80px'; img.className = 'rounded-md mx-0.5'; 
+                    imgContainer.appendChild(img);
+                });
+                messageContent.appendChild(imgContainer);
+            }
+          } else if (role==='assistant') {
+            messageContent.innerHTML = marked.parse(content);
+          }
+
+          if (role === 'assistant') {setTimeout(() => mermaid.init(undefined, messageContent.querySelectorAll('.mermaid')), 0);}
+          if (scroll) this.scrollToBottom();
+        };
+        const updateReason = async(reason) => {
+          messageReason.innerHTML = reason; messageDiv.appendChild(messageReason);
+        }; 
+        const save = async( ) => { 
+            const content = messageContent.getAttribute('raw');
+            const images = messageContent.getAttribute('images');
+            if(!content && !images) return;
+            await this.db.saveMessage({ id: msgId,  role: role, content: messageContent.getAttribute('raw'), timestamp: Date.now(), images: messageContent.getAttribute('images') });
+        };
+        return {msgId, messageDiv, add, update, save, updateReason };
+      }
+
+      async clearChat() {
+        const messages = await this.db.getAllMessages();
+        for (const message of messages) { await this.db.deleteCollectionData('messages', message.id); }
+        this.container.innerHTML = ''; 
+      }
+
+      async loadMessages() {
+        const messages = await this.db.getAllMessages();
+        for (const message of messages) {
+          const { msgId, messageDiv, add, update } = await this.newMessage(message.role);
+          await update(message.content, {scroll:false, images:message.images ? JSON.parse(message.images) : []});
+          add();
+        }
+      }
+    }
+
+    class AdvancedInput {
+      // 聊天输入框类，主要控制message-input的输入, 以及发送按钮的状态， 还有点击发送按钮后的回调
+      constructor() {
+        this.input = document.getElementById('message-input');
+        this.sendButton = document.getElementById('send-button');
+        this.sendIcon = document.getElementById('send-icon');
+        this.loadingIcon = document.getElementById('loading-icon');
+        this.imageUploadInput = document.getElementById('image-upload-input');
+        this.imagePreviewContainer = document.getElementById('image-preview-container');
+        this.mcpToggle = document.getElementById('mcp-toggle');
+        this.mcpStatus = 0;  // 0=>未链接, 2=>连接中, 1=>链接成功
+        this.mcpcli = null;
+        this.isProcessing = false;
+        this.init()
+      }
+
+      init() {
+        this.mcpToggle.addEventListener('click', this.mcpClient.bind(this));
+        this.input.addEventListener('input', () => {this.sendButton.disabled = !this.input.value.trim();});
+        this.input.addEventListener('keydown', (e) => {if (e.key === 'Enter' && e.ctrlKey) {e.preventDefault();this.sendButton.click();}});
+        this.imageUploadInput.addEventListener('change', (e)=>{
+            const files = e.target.files;
+            if (files.length > 0) {
+                for (const file of files) {
+                  const reader = new FileReader();
+                  reader.onload = (event) => {
+                      const a = document.createElement('a'); a.className = 'uk-position-relative';
+                      const img = document.createElement('img'); img.src = event.target.result; img.classList.add('rounded-md'); img.style.height='64px'
+                      a.appendChild(img);
+                      const deleteBtn = document.createElement('button');deleteBtn.className = 'uk-icon-button uk-position-top-right uk-position-small';
+                      deleteBtn.setAttribute('uk-icon', 'trash');deleteBtn.style.backgroundColor = 'rgba(255,255,255,0.4)';
+                      deleteBtn.onclick = (e) => {e.preventDefault(); a.remove();};
+                      a.appendChild(deleteBtn);
+                      this.imagePreviewContainer.appendChild(a);
+                  };
+                  reader.readAsDataURL(file);
+                }
+            }
+        })
+        this.sendButton.onclick = () => {
+          if (this.isProcessing) return;
+          if(!this.input.value.trim()) { return }
+          
+          // 显示loading状态
+          this.isProcessing = true;
+          this.sendButton.disabled = false;
+          this.sendIcon.classList.add('hidden');
+          this.loadingIcon.classList.remove('hidden');
+          
+          return new Promise((resolve, reject) => {
+            const message = { content: this.input.value, images: [...document.getElementById('image-preview-container').querySelectorAll('img')].map(x=>x.src) };
+            window.aiui.onSendMessage(message, resolve, reject);
+          }).catch((error) => {
+            console.error('Error:', error);
+          }).finally(() => {
+            this.isProcessing = false;
+            this.input.value = '';
+            this.imagePreviewContainer.innerHTML = '';
+            this.imageUploadInput.value = '';
+            this.input.style.height = 'auto';
+            
+            // 恢复正常状态
+            this.sendIcon.classList.remove('hidden');
+            this.loadingIcon.classList.add('hidden');
+            this.sendButton.disabled = !this.input.value.trim();
+          });
+        };
+      }
+
+      async mcpClient() {
+          if(this.mcpStatus===1) {
+            this.mcpcli.close()
+            this.mcpcli = null
+            window.aiui.ai.toolFn = null
+            this.mcpStatus = false
+            this.mcpToggle.classList.remove('uk-spinner')
+            this.mcpToggle.classList.remove('text-cyan-400')
+            this.mcpToggle.setAttribute('uk-tooltip', 'MCP已断开。请重新链接')
+            return
+          }else if(this.mcpStatus===2) {
+            UIkit.notification({message: '正在连接MCP，请稍等',status: 'warning',pos: 'top-center',timeout: 1000});
+            return
+          }
+          const mcpaddress = window.aiui.settings.settings.mcp;
+          if(!mcpaddress) {
+            UIkit.notification({message: '请先设置MCP服务器地址',status: 'warning',pos: 'top-center',timeout: 5000});
+            window.aiui.settings.open()
+            return 
+          }
+          const mcpcli = new MCPCli(mcpaddress)
+          this.mcpToggle.classList.add('uk-spinner')
+          this.mcpToggle.setAttribute('uk-tooltip', '连接中...')
+          this.mcpStatus = 2
+          mcpcli.connect()
+          .then(cli=>{
+            this.mcpcli = cli
+            this.mcpStatus = 1
+            this.mcpToggle.setAttribute('uk-tooltip', 'MCP已连接')
+            //this.mcpToggle.classList.remove('uk-spinner')
+            this.mcpToggle.classList.add('text-cyan-400')
+            UIkit.notification({message: 'MCP连接成功',status: 'success',pos: 'top-center',timeout: 5000});
+            window.aiui.ai.toolFn = cli
+          })
+          .catch(err=>{
+            console.error(err)
+            UIkit.notification({message: 'MCP连接失败',status: 'danger',pos: 'top-center',timeout: 5000});
+            this.mcpToggle.classList.remove('uk-spinner')
+            this.mcpToggle.removeAttribute('uk-tooltip')
+            this.mcpStatus = 0
+          })
+          
+
+      }
+    }
+
+    class AdvancedSettings {
+      constructor(db) {
+        this.db = db;
+        this.settingsButton = document.getElementById('api-settings');
+        this.saveButton = document.getElementById('save-settings');
+        this.settingsModal = document.getElementById('settings-modal');
+        this.settings = {}
+        this.init()
+      }
+
+      async init() {
+        this.settingsButton.addEventListener('click', this.open.bind(this));
+        this.saveButton.addEventListener('click', this.save.bind(this));
+        document.getElementById('temperature').addEventListener('input', (e) => {
+          document.getElementById('temperature-value').textContent = e.target.value;
+        });
+        document.getElementById('topP').addEventListener('input', (e) => {
+          document.getElementById('top-p-value').textContent = e.target.value;
+        });
+        await this.get();
+      }
+      
+      async open() {
+        const settings = await this.get();
+        document.getElementById('apiKey').value = settings.apiKey || '';
+        document.getElementById('mcp').value = settings.mcp || '';
+        document.getElementById('baseURL').value = settings.baseURL || 'https://text.pollinations.ai/openai';
+        document.getElementById('model').value = settings.model || 'openai';
+        document.getElementById('systemPrompt').value = settings.systemPrompt || '';
+        document.getElementById('temperature').value = settings.temperature || 0.7;
+        document.getElementById('temperature-value').textContent = settings.temperature || 0.7;
+        document.getElementById('maxTokens').value = settings.maxTokens || 128000;
+        document.getElementById('topP').value = settings.topP || 1.0;
+        document.getElementById('top-p-value').textContent = settings.topP || 1.0;
+        UIkit.modal(this.settingsModal).show();
+      }
+      
+      close() { UIkit.modal(this.settingsModal).hide();}
+
+      async save() {
+        for (const setting of ['apiKey', 'mcp', 'baseURL', 'model', 'systemPrompt', 'temperature', 'maxTokens', 'topP']) {
+          await this.db.setCollectionData('settings', { key: setting, value: document.getElementById(setting).value });
+        }
+        UIkit.notification({message: '设置已保存',status: 'success',pos: 'top-center',timeout: 2000});
+        this.close();
+        await this.get()
+        window.dispatchEvent(new CustomEvent('settingsUpdate', {detail: this.settings}));
+        return this.settings;
+      }
+
+      async get() {
+        const default_settings = {
+            'apiKey': '', 'baseURL': 'https://text.pollinations.ai/openai','mcp':'',
+            'model': 'openai', 'systemPrompt': '',
+            'temperature': 0.61, 'maxTokens': 128000, 'topP': 0.95
+        }
+        const saved_settings = (await this.db.getSettings()).reduce((acc, setting) => {acc[setting.key] = setting.value;return acc;}, {});
+        this.settings = {...default_settings, ...saved_settings};
+        return this.settings;
+      }
+    }
+
+    // AIUI类
+    class AIUI {
+      constructor(options = {}) {        
+        this.chatId = options.chatId
+        this.ready = this.init()
+      }
+
+      async init() {
+        if (!this.chatId) {
+          const chat = await window.MainDatabase.getOrCreateLastChat();
+          await window.conversations.loadConversation(chat.id);
+          return
+        }
+        this.db = new ChatDatabase(this.chatId);
+        this.container = new AdvancedContainer(this.db);
+        this.input = new AdvancedInput();
+        this.settings = new AdvancedSettings(this.db);
+        await this.settings.get();
+
+        const messages = (await this.db.getAllMessages()).map(m => ({role:m.role, content:m.content}));
+        this.ai = new AI({
+          messages: messages,
+          system_prompt: this.settings.settings.systemPrompt || '',
+          model: this.settings.settings.model,
+          apiKey: this.settings.settings.apiKey || '',
+          baseURL: this.settings.settings.baseURL,
+          completionsURI: '',
+          opts: {
+            temperature: parseFloat(this.settings.settings.temperature) || 0.7,
+            max_tokens: parseInt(this.settings.settings.maxTokens) || 128000,
+            top_p: parseFloat(this.settings.settings.topP) || 1.0
+          }
+        });
+
+        window.addEventListener('settingsUpdate', async (e) => {
+          this.ai = new AI({
+            messages: this.ai.messages,
+            system_prompt: e.detail.systemPrompt || '',
+            model: e.detail.model,
+            apiKey: e.detail.apiKey || '',
+            baseURL: e.detail.baseURL,
+            completionsURI: '',
+            opts: {
+              temperature: parseFloat(e.detail.temperature) || 0.7,
+              max_tokens: parseInt(e.detail.maxTokens) || 128000,
+              top_p: parseFloat(e.detail.topP) || 1.0
+            }
+          });
+        });
+
+        await this.container.loadMessages();
+      }
+      
+      async onSendMessage(message, resolve, reject) {
+        const { content, images } = message;
+        if (!content.trim()) {reject('消息不能为空');return}
+        if (window.conversations.topicTitle.innerText === '') {
+          await window.conversations.setConversationTitle(this.chatId, content.slice(0, 30));
+        }
+        const userMessage = await this.container.newMessage('user');
+        await userMessage.add();
+        await userMessage.update(content.trim(), true, images);
+        await userMessage.save();
+
+        const assistantMessage = await this.container.newMessage('assistant');
+        await assistantMessage.add();
+        await assistantMessage.update('',{spin:true});
+      
+        try {
+          // 调用AI生成回复
+          this.currentResponse = await this.ai.create(content.trim(), {images: images});
+          let fullResponse = '';
+          
+          // 处理流式响应
+          for await (const chunk of this.currentResponse.on('content')) {
+            if (chunk.delta) {
+              fullResponse += chunk.delta;
+              await assistantMessage.update(fullResponse, true);
+            }
+          }
+          await assistantMessage.save();
+          resolve(fullResponse);
+        } catch (error) {
+          await assistantMessage.update('抱歉，哪里出现了错误了。 请稍后再试。');
+          reject(error);
+        } 
+      }
+    }
+
+    document.addEventListener('DOMContentLoaded', async function() {
+      
+        const { markedHighlight } = window.markedHighlight;
+        marked.use(markedHighlight({
+            langPrefix: 'hljs language-',
+            highlight: function(code, lang) {
+                if (lang === 'mermaid') { return '<div class="mermaid">' + code + '</div>';}
+                const language = hljs.getLanguage(lang) ? lang : 'plaintext';
+                return hljs.highlight(code, {language: language}).value;
+            }
+        }));
+
+        window.conversations = new AdvancedConversation();
+        await window.conversations.loadConversations();
+        window.aiui = new AIUI();
+        await window.aiui.ready
+
+        window.scrollTo(0, 1);
+        //document.body.requestFullscreen()
+    });
+  </script>
+</body>
+</html>

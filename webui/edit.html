@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MCP应用编辑器</title>
+    <!-- TailwindCSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: {
+                            50: '#e3f2fd',
+                            100: '#bbdefb',
+                            200: '#90caf9',
+                            300: '#64b5f6',
+                            400: '#42a5f5',
+                            500: '#2196f3',
+                            600: '#1e88e5',
+                            700: '#1976d2',
+                            800: '#1565c0',
+                            900: '#0d47a1'
+                        },
+                        secondary: '#64748b'
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- UIkit CSS -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/uikit@3.16.26/dist/css/uikit.min.css" />
+    <!-- UIkit JS -->
+    <script src="https://cdn.jsdelivr.net/npm/uikit@3.16.26/dist/js/uikit.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/uikit@3.16.26/dist/js/uikit-icons.min.js"></script>
+    <style>
+        .uk-card {
+            border-radius: 1rem;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+        }
+        .uk-button {
+            border-radius: 0.5rem;
+            transition: all 0.2s ease;
+        }
+        .uk-button-primary {
+            background: linear-gradient(145deg, #1e88e5, #1976d2);
+            box-shadow: 0 4px 6px -1px rgba(30, 136, 229, 0.2);
+        }
+        .uk-button-primary:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 10px 15px -3px rgba(30, 136, 229, 0.3);
+        }
+        .uk-input, .uk-select, .uk-textarea {
+            border-radius: 0.5rem;
+            transition: all 0.2s ease;
+        }
+        .uk-input:focus, .uk-select:focus, .uk-textarea:focus {
+            box-shadow: 0 0 0 3px rgba(30, 136, 229, 0.2);
+        }
+        .uk-form-label {
+            font-weight: 500;
+            margin-bottom: 0.5rem;
+            color: #334155;
+        }
+    </style>
+</head>
+<body class="bg-slate-100 min-h-screen">
+    <!-- 导航栏 -->
+    <nav class="bg-gradient-to-r from-primary-700 to-primary-500 shadow-lg">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between h-16">
+                <div class="flex items-center text-white">
+        
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-6">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="m20.893 13.393-1.135-1.135a2.252 2.252 0 0 1-.421-.585l-1.08-2.16a.414.414 0 0 0-.663-.107.827.827 0 0 1-.812.21l-1.273-.363a.89.89 0 0 0-.738 1.595l.587.39c.59.395.674 1.23.172 1.732l-.2.2c-.212.212-.33.498-.33.796v.41c0 .409-.11.809-.32 1.158l-1.315 2.191a2.11 2.11 0 0 1-1.81 1.025 1.055 1.055 0 0 1-1.055-1.055v-1.172c0-.92-.56-1.747-1.414-2.089l-.655-.261a2.25 2.25 0 0 1-1.383-2.46l.007-.042a2.25 2.25 0 0 1 .29-.787l.09-.15a2.25 2.25 0 0 1 2.37-1.048l1.178.236a1.125 1.125 0 0 0 1.302-.795l.208-.73a1.125 1.125 0 0 0-.578-1.315l-.665-.332-.091.091a2.25 2.25 0 0 1-1.591.659h-.18c-.249 0-.487.1-.662.274a.931.931 0 0 1-1.458-1.137l1.411-2.353a2.25 2.25 0 0 0 .286-.76m11.928 9.869A9 9 0 0 0 8.965 3.525m11.928 9.868A9 9 0 1 1 8.965 3.525" />
+                    </svg>                      
+                    <span class="ml-2 text-xl font-bold">MCP应用编辑器</span>
+                </div>
+                <div class="flex items-center gap-6">
+                    <button class="bg-white bg-opacity-20 hover:bg-opacity-30 text-white rounded-lg px-4 py-2 flex items-center transition-all" id="exportConfigBtn">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-5 mr-2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 7.5h1.5m-1.5 3h1.5m-7.5 3h7.5m-7.5 3h7.5m3-9h3.375c.621 0 1.125.504 1.125 1.125V18a2.25 2.25 0 0 1-2.25 2.25M16.5 7.5V18a2.25 2.25 0 0 0 2.25 2.25M16.5 7.5V4.875c0-.621-.504-1.125-1.125-1.125H4.125C3.504 3.75 3 4.254 3 4.875V18a2.25 2.25 0 0 0 2.25 2.25h13.5M6 7.5h3v3H6v-3Z" />
+                        </svg>
+                        导出JSON
+                    </button>
+
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- 主内容区域 -->
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div class="grid grid-cols-12 gap-6">
+            <!-- 侧边栏 -->
+            <div class="col-span-12 md:col-span-3 space-y-6">
+                <!-- 基本信息卡片 -->
+                <div class="bg-white rounded-xl shadow-sm p-6">
+                    <h2 class="text-lg font-bold text-gray-800 mb-4">应用信息</h2>
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">应用名称</label>
+                            <input type="text" id="appName" class="border w-full h-10 px-3 rounded-lg border-gray-200 focus:border-primary-500 focus:ring focus:ring-primary-500 focus:ring-opacity-20" placeholder="输入应用名称">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">应用描述</label>
+                            <textarea id="appDescription" rows="3" class="border w-full px-3 py-2 rounded-lg border-gray-200 focus:border-primary-500 focus:ring focus:ring-primary-500 focus:ring-opacity-20" placeholder="描述此应用的用途"></textarea>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 导入/导出卡片 -->
+                <div class="bg-white rounded-xl shadow-sm p-6">
+                    <h2 class="text-lg font-bold text-gray-800 mb-4">配置管理</h2>
+                    <div class="space-y-3 mb-3">
+                        <button class="w-full flex items-center justify-center px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white text-sm font-medium rounded-lg transition-colors" id="saveConfigBtn">
+                            <svg class="w-4 h-4 mr-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-5 mr-2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M9 3.75H6.912a2.25 2.25 0 0 0-2.15 1.588L2.35 13.177a2.25 2.25 0 0 0-.1.661V18a2.25 2.25 0 0 0 2.25 2.25h15A2.25 2.25 0 0 0 21.75 18v-4.162c0-.224-.034-.447-.1-.661L19.24 5.338a2.25 2.25 0 0 0-2.15-1.588H15M2.25 13.5h3.86a2.25 2.25 0 0 1 2.012 1.244l.256.512a2.25 2.25 0 0 0 2.013 1.244h3.218a2.25 2.25 0 0 0 2.013-1.244l.256-.512a2.25 2.25 0 0 1 2.013-1.244h3.859M12 3v8.25m0 0-3-3m3 3 3-3" />
+                            </svg>
+                            保存配置
+                        </button>
+                    </div>
+                    <div class="space-y-3">
+                        <button class="w-full flex items-center justify-center px-4 py-2 bg-violet-600 bg-opacity-80 hover:bg-violet-700 text-white text-sm font-medium rounded-lg transition-colors" id="importJsonBtn">
+                            <svg class="w-4 h-4 mr-2" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                            </svg>
+                            导入JSON
+                        </button>
+                        <button class="w-full flex items-center justify-center px-4 py-2 text-primary-700 bg-primary-50 hover:bg-primary-100 text-sm font-medium rounded-lg transition-colors" id="useTemplateBtn">
+                            <svg class="w-4 h-4 mr-2" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <path d="M8 7v8a2 2 0 002 2h6M8 7V5a2 2 0 012-2h4.586a1 1 0 01.707.293l4.414 4.414a1 1 0 01.293.707V15a2 2 0 01-2 2h-2M8 7H6a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2v-2" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                            </svg>
+                            使用模板
+                        </button>
+                        <button class="w-full flex items-center justify-center px-4 py-2 text-red-700 bg-red-50 hover:bg-red-100 text-sm font-medium rounded-lg transition-colors" id="deleteAppBtn">
+                            <svg class="w-4 h-4 mr-2" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <path d="M19 7L18.1327 19.1425C18.0579 20.1891 17.187 21 16.1378 21H7.86224C6.81296 21 5.94208 20.1891 5.86732 19.1425L5 7M10 11V17M14 11V17M15 7V4C15 3.44772 14.5523 3 14 3H10C9.44772 3 9 3.44772 9 4V7M4 7H20" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                            </svg>
+                            删除应用
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 主要内容区域 -->
+            <div class="col-span-12 md:col-span-9 space-y-6">
+                <!-- 服务器列表 -->
+                <div class="bg-white rounded-xl shadow-sm p-6">
+                    <div class="flex justify-between items-center mb-6">
+                        <h2 class="text-lg font-bold text-gray-800">服务器配置</h2>
+                        <button class="inline-flex items-center px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white text-sm font-medium rounded-lg transition-colors" id="addServerBtn">
+                            <svg class="w-4 h-4 mr-2" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <path d="M12 6v12M18 12H6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                            </svg>
+                            MCP
+                        </button>
+                    </div>
+
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left">
+                            <thead class="bg-gray-50 text-gray-600 text-xs uppercase tracking-wider">
+                                <tr>
+                                    <th class="px-4 py-3 rounded-tl-lg">名称</th>
+                                    <th class="px-4 py-3">类型</th>
+                                    <th class="px-4 py-3">命令</th>
+                                    <th class="px-4 py-3 rounded-tr-lg text-right">操作</th>
+                                </tr>
+                            </thead>
+                            <tbody id="serverTableBody" class="divide-y divide-gray-100">
+                                <!-- 服务器列表项会动态添加到这里 -->
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div id="emptyServerMessage" class="text-center py-8 text-gray-500 hidden">
+                        还没有添加任何服务器配置
+                    </div>
+                </div>
+
+                <!-- JSON预览区域 -->
+                <div class="bg-white rounded-xl shadow-sm p-6">
+                    <h2 class="text-lg font-bold text-gray-800 mb-4">JSON预览</h2>
+                    <div class="relative">
+                        <pre id="jsonPreview" class="bg-gray-50 p-4 rounded-lg text-sm font-mono overflow-x-auto"></pre>
+                        <button id="copyJsonBtn" class="absolute top-2 right-2 p-2 text-gray-500 hover:text-gray-700 bg-white rounded-lg shadow-sm">
+                            <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <path d="M8 7v8a2 2 0 002 2h6M8 7V5a2 2 0 012-2h4.586a1 1 0 01.707.293l4.414 4.414a1 1 0 01.293.707V15a2 2 0 01-2 2h-2M8 7H6a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2v-2" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 服务器配置模态框 -->
+    <div id="server-modal" uk-modal>
+        <div class="uk-modal-dialog uk-modal-body rounded-xl">
+            <button class="uk-modal-close-default" type="button" uk-close></button>
+            <h2 class="text-2xl font-bold mb-6" id="serverModalTitle">添加服务器</h2>
+            
+            <form id="serverForm" class="space-y-6">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">服务器名称</label>
+                        <input type="text" id="serverName" required class="border w-full h-10 px-3 rounded-lg border-gray-200 focus:border-primary-500 focus:ring focus:ring-primary-500 focus:ring-opacity-20" placeholder="输入服务器名称">
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">服务器类型</label>
+                        <select id="serverType" class="border w-full h-10 px-3 rounded-lg border-gray-200 focus:border-primary-500 focus:ring focus:ring-primary-500 focus:ring-opacity-20">
+                            <option value="sse">SSE (远程服务)</option>
+                            <option value="stdio">STDIO (本地进程)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">服务器描述</label>
+                    <textarea  id="serverDescription" class="border w-full min-h-[48px] p-2 rounded-lg focus:border-sky-200"></textarea>
+                </div>
+
+                <!-- SSE配置 -->
+                <div id="sseConfig" class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Base URL</label>
+                        <input type="text" id="baseUrl" class="border w-full h-10 px-3 rounded-lg border-gray-200 focus:border-primary-500 focus:ring focus:ring-primary-500 focus:ring-opacity-20" placeholder="http://example.com/api">
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-3">Headers</label>
+                        <div id="headersContainer" class="space-y-2">
+                            <!-- Headers会动态添加到这里 -->
+                        </div>
+                        <button type="button" id="addHeaderBtn" class="mt-2 inline-flex items-center px-3 py-2 text-sm font-medium text-primary-600 bg-primary-50 rounded-lg hover:bg-primary-100 transition-colors">
+                            <svg class="w-4 h-4 mr-1" viewBox="0 0 24 24" fill="none">
+                                <path d="M12 6v12M18 12H6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                            </svg>
+                            添加Header
+                        </button>
+                    </div>
+                </div>
+
+                <!-- STDIO配置 -->
+                <div id="stdioConfig" class="space-y-4 hidden">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Command</label>
+                        <input type="text" id="command" class="border w-full h-10 px-3 rounded-lg border-gray-200 focus:border-primary-500 focus:ring focus:ring-primary-500 focus:ring-opacity-20" placeholder="执行的命令">
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-3">参数列表</label>
+                        <div id="argsContainer" class="space-y-2">
+                            <!-- 参数会动态添加到这里 -->
+                        </div>
+                        <button type="button" id="addArgBtn" class="mt-2 inline-flex items-center px-3 py-2 text-sm font-medium text-primary-600 bg-primary-50 rounded-lg hover:bg-primary-100 transition-colors">
+                            <svg class="w-4 h-4 mr-1" viewBox="0 0 24 24" fill="none">
+                                <path d="M12 6v12M18 12H6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                            </svg>
+                            添加参数
+                        </button>
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-3">环境变量</label>
+                        <div id="envContainer" class="space-y-2">
+                            <!-- 环境变量会动态添加到这里 -->
+                        </div>
+                        <button type="button" id="addEnvBtn" class="mt-2 inline-flex items-center px-3 py-2 text-sm font-medium text-primary-600 bg-primary-50 rounded-lg hover:bg-primary-100 transition-colors">
+                            <svg class="w-4 h-4 mr-1" viewBox="0 0 24 24" fill="none">
+                                <path d="M12 6v12M18 12H6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                            </svg>
+                            添加环境变量
+                        </button>
+                    </div>
+                </div>
+
+                <div class="flex justify-end space-x-4 pt-4">
+                    <button type="submit" class="inline-flex items-center px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white font-medium rounded-lg shadow hover:shadow-lg transition-all">
+                        <svg class="w-5 h-5 mr-2" viewBox="0 0 24 24" fill="none">
+                            <path d="M5 13l4 4L19 7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                        </svg>
+                        保存配置
+                    </button>
+                    <button type="button" class="uk-modal-close inline-flex items-center px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-800 font-medium rounded-lg transition-colors">
+                        取消
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- 模板选择模态框 -->
+    <div id="template-modal" uk-modal>
+        <div class="uk-modal-dialog uk-modal-body rounded-xl w-2/5">
+            <button class="uk-modal-close-default" type="button" uk-close></button>
+            <h2 class="text-2xl font-bold mb-4 ">选择模板</h2>
+            
+            <div id="templateLoading" class="flex justify-center items-center py-8">
+                <div uk-spinner></div>
+                <span class="ml-3">加载模板列表...</span>
+            </div>
+            
+            <div id="templateTableContainer" class="hidden">
+                <div class="flex justify-between items-center mb-4">
+                    <div class="flex items-center">
+                        <input type="checkbox" id="selectAllTools" class="mr-2 h-4 w-4 rounded text-primary-600">
+                        <label for="selectAllTools" class="text-sm font-medium text-gray-700">全选</label>
+                    </div>
+                    <button id="addSelectedToolsBtn" class="inline-flex items-center px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white text-sm font-medium rounded-lg transition-colors">
+                        <svg class="w-4 h-4 mr-2" viewBox="0 0 24 24" fill="none">
+                            <path d="M12 6v12M18 12H6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                        </svg>
+                        添加选中的模板
+                    </button>
+                </div>
+                
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left">
+                        <thead class="bg-gray-50 text-gray-600 text-xs uppercase tracking-wider">
+                            <tr>
+                                <th class="px-4 py-3 rounded-tl-lg w-10"></th>
+                                <th class="px-4 py-3">名称</th>
+                                <th class="px-4 py-3">类型</th>
+                                <th class="px-4 py-3 rounded-tr-lg">描述</th>
+                            </tr>
+                        </thead>
+                        <tbody id="templateTableBody" class="divide-y divide-gray-100">
+                            <!-- 模板列表项会动态添加到这里 -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            
+            <div id="noTemplatesMessage" class="text-center py-8 text-gray-500 hidden">
+    <div id="json-modal" uk-modal>
+        <div class="uk-modal-dialog uk-modal-body rounded-xl">
+            <button class="uk-modal-close-default" type="button" uk-close></button>
+            <h2 class="text-2xl font-bold mb-4">导入JSON配置</h2>
+            
+            <div class="mb-4">
+                <textarea id="jsonInput" class="w-full h-96 px-4 py-3 font-mono text-sm border rounded-xl focus:border-primary-500 focus:ring focus:ring-primary-500 focus:ring-opacity-20" placeholder="在此粘贴JSON配置..."></textarea>
+            </div>
+            
+            <div class="flex justify-end">
+                <button type="button" id="importBtn" class="inline-flex items-center px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white font-medium rounded-lg transition-colors">
+                    <svg class="w-5 h-5 mr-2" viewBox="0 0 24 24" fill="none">
+                        <path d="M5 13l4 4L19 7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                    导入配置
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script src="js/MCPEditor.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const editor = new MCPEditor();
+            editor.init();
+        });
+    </script>
+</body>
+</html>
