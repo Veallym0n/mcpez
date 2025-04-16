@@ -3,9 +3,9 @@
   class AI {
     constructor(options = {}) {
       this.api_key = options.api_key || options.apiKey || '';
-      this.baseURL = options.baseURL || options.endpoint || 'https://porky.toai.chat/gemini/v1';
+      this.baseURL = options.baseURL || options.endpoint || 'https://porky.toai.chat/to/openrouter';
       this.completionsURI = options.completionsURI === undefined ? '/chat/completions' : '';
-      this.model = options.model || 'gemini-2.0-flash';
+      this.model = options.model || 'deepseek/deepseek-r1-distill-qwen-32b:free';
       this.messages = options.messages || [];
       this.system_prompt = options.system_prompt || options.sysprompt || '';
       this.abortController = null;
@@ -13,14 +13,8 @@
       this.opts = { temperature: 0.7, max_tokens: 128000, top_p: 1, stream: true, ...options.opts };
       this.completions = { create: this.create.bind(this) };
       this.filters = {}; 
-      
-      // 添加默认过滤器
-      this.add_response_filter('content', data => data.type === 'content' || (typeof data.content === 'string' && data.content));
-      this.add_response_filter('reasoning_content', data => data.type === 'reasoning_content'); // 保留过滤器但不使用字段
-      this.add_response_filter('tool_calls', data => data.type === 'tool_calls');
-      this.add_response_filter('tool_request', data => data.type === 'tool_request');
-      this.add_response_filter('tool_response', data => data.type === 'tool_response');
-      this.add_response_filter('final', data => data.type === 'final');
+
+      this.add_response_filter('reasoning', data=>!!data.choices?.[0]?.delta?.reasoning);
       
       return this;
     }
@@ -171,14 +165,23 @@
     
     async processEvent(event, msg, toolCalls, iter) {
       const { type, data, raw } = event;
-      
+
+      // 应用过滤器并推送到队列
+      Object.keys(this.filters).forEach((filter_name)=>{
+        const filter = this.filters[filter_name];
+        const shouldpush = filter.some(f=>f(data))
+        if (shouldpush) {
+          iter.push(filter_name, { type: filter_name, message: {...msg}, delta: data });
+        }
+      })
+
       // 处理对象数据
       if (!raw && typeof data === 'object') {
         // 处理工具调用
         if (data.choices && data.choices[0]?.delta?.tool_calls) {
           this.updateToolCalls(data.choices[0].delta.tool_calls, toolCalls);
-          iter.push('streaming', { type: 'tool_calls', toolCalls: [...toolCalls], message: {...msg}, delta: data });
-          
+          iter.push('tool_calls', { type: 'tool_calls', toolCalls: [...toolCalls], message: {...msg}, delta: data });
+
           if (data.choices[0].finish_reason === 'tool_calls') {
             msg.tool_calls = [...toolCalls];
             iter.push('tool_request', { type: 'tool_request', toolCalls: [...toolCalls], message: {...msg} });
@@ -186,27 +189,22 @@
           }
           return;
         }
-        
+
         // 处理内容更新
         const content = data.choices?.[0]?.delta?.content || '';
         if (content) {
           msg.content += content;
-          iter.push('streaming', { type: 'content', content, message: {...msg}, delta: content });
+          iter.push('content', { type: 'content', content, message: {...msg}, delta: content });
           return;
         }
       } else {
         // 处理字符串和其他类型的数据
         switch (type) {
-          case 'reasoning_content':
-            // 收到 reasoning_content 但不存储在 msg 对象中
-            // 只发送流式事件但不累积
-            iter.push('streaming', { type, content: data, delta: data });
-            break;
           case 'tool_calls':
             if (Array.isArray(data)) {
               this.updateToolCalls(data, toolCalls);
-              iter.push('streaming', { type, toolCalls: [...toolCalls], message: {...msg}, delta: data });
-              
+              iter.push('tool_calls', { type, toolCalls: [...toolCalls], message: {...msg}, delta: data });
+
               if (toolCalls.every(t => t.function?.arguments)) {
                 msg.tool_calls = [...toolCalls];
                 iter.push('tool_request', { type: 'tool_request', toolCalls: [...toolCalls], message: {...msg} });
@@ -217,7 +215,7 @@
           case 'content':
             if (data) {
               msg.content += data;
-              iter.push('streaming', { type, content: data, message: {...msg}, delta: data });
+              iter.push('content', { type, content: data, message: {...msg}, delta: data });
             }
             break;
         }
@@ -329,8 +327,8 @@
       this.completed = false;
       this.filters = filters;
       
-      // 创建所有队列
-      ['content', 'reasoning_content', 'tool_calls', 'tool_request', 
+      // 创建所有队列 - 移除 reasoning_content
+      ['content', 'tool_calls', 'tool_request', 
        'tool_response', 'streaming', 'final', ...Object.keys(filters)].forEach(t => {
         this.queues.set(t, []);
         this.waiters.set(t, []);
@@ -344,25 +342,11 @@
     
     push(type, data) {
       if (this.completed) return;
-      
-      // 处理基本队列
+      // 仅处理基本队列
       const queue = this.queues.get(type) || [];
       const waiters = this.waiters.get(type) || [];
       queue.push(data);
       if (waiters.length) waiters.shift()();
-      
-      // 应用自定义过滤器
-      Object.keys(this.filters).forEach(queueName => {
-        const filterFns = this.filters[queueName];
-        if (Array.isArray(filterFns) && filterFns.some(fn => fn(data))) {
-          const customQueue = this.queues.get(queueName);
-          const customWaiters = this.waiters.get(queueName);
-          if (customQueue) {
-            customQueue.push(data);
-            if (customWaiters && customWaiters.length) customWaiters.shift()();
-          }
-        }
-      });
     }
     
     complete() {

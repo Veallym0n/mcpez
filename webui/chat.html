@@ -26,8 +26,8 @@
 
   <script src="https://cdn.tailwindcss.com"></script>
   
-  <script src="libs/ai/ai.js"></script>
-  <script src="libs/mcpcli.js"></script>
+  <script src="ai/ai.js"></script>
+  <script src="mcp/mcpcli.js"></script>
   
   <script>
     tailwind.config = {
@@ -349,7 +349,6 @@
     class ChatDatabase extends DataBase {
       constructor(chatId) {
         if(!chatId) {
-          debugger;
           throw new Error('Chat ID is required');
         }
         super(`ChatDB-${chatId}`, {
@@ -415,6 +414,7 @@
           item.addEventListener('click', (e) => {this.loadConversation(conversation.id);});
           this.conversationList.appendChild(item);
         }
+        return conversations;
       }
       async createNewConversation() {
         const chat = await this.db.createNewConversation(Date.now(), '');
@@ -422,7 +422,7 @@
         await this.loadConversation(chat.id);
       }
       async loadConversation(id) {
-        await this.loadConversations()
+        localStorage.setItem('last_chat_id', id);
         const conversations = await this.db.getAllConversations(id);
         if (conversations.length > 0) {
           const conversation = conversations[0];
@@ -457,20 +457,55 @@
 
     class AdvancedContainer {
       // 聊天消息容器类，主要控制chat-container的消息
+      static instance = null;
+      
+      static getInstance(db) {
+        if (!AdvancedContainer.instance) {
+          AdvancedContainer.instance = new AdvancedContainer(db);
+        } else if (db && AdvancedContainer.instance.db !== db) {
+          // 当数据库引用变化时，更新数据库引用并重置容器
+          AdvancedContainer.instance.db = db;
+          AdvancedContainer.instance.resetContainer();
+          AdvancedContainer.instance.loadMessages(); // 自动加载新数据库的消息
+        }
+        return AdvancedContainer.instance;
+      }
+      
       constructor(db) {
+        // 如果已经有实例，直接返回
+        if (AdvancedContainer.instance) {
+          return AdvancedContainer.instance;
+        }
+        
         this.container = document.getElementById('chat-container');
         this.clearChatButton = document.getElementById('clear-chat');
         this.container.innerHTML = ''; // 初始化的时候，清空容器
         this.db = db;
-        this.ready = this.init()
+        this.initialized = false;
+        this.ready = this.init();
+        
+        AdvancedContainer.instance = this;
+      }
+
+      // 重置容器，清空内容
+      resetContainer() {
+        this.container.innerHTML = '';
       }
 
       async init() {
+        // 确保初始化和事件绑定只执行一次
+        if (this.initialized) return;
+        
         this.clearChatButton.addEventListener('click', async() => {
           await UIkit.modal.confirm('确定要清空聊天记录吗？', {labels: {ok: '清空', cancel: '取消'}}).then(async () => {
-            await this.clearChat();window.aiui.ai.messages = [];
+            await this.clearChat();
+            if (window.aiui && window.aiui.ai) {
+              window.aiui.ai.messages = [];
+            }
           });
         });
+        
+        this.initialized = true;
       }
 
       scrollToBottom() {
@@ -500,8 +535,10 @@
         }
 
         const messageReason = document.createElement('div');
-        messageReason.className = 'message-reason';
+        messageReason.className = 'message-reason opacity-30 markdown-body max-h-[32px] overflow-hidden hover:cursor-pointer hover:opacity-60 hover:font-weight-light';
         messageReason.setAttribute('raw', '');
+        messageReason.addEventListener('click', (e)=>{ messageReason.classList.toggle("max-h-[48px]")} )
+        messageDiv.appendChild(messageReason)
 
         messageDiv.appendChild(messageReason);
         messageDiv.appendChild(messageContent);
@@ -533,7 +570,8 @@
           if (scroll) this.scrollToBottom();
         };
         const updateReason = async(reason) => {
-          messageReason.innerHTML = reason; messageDiv.appendChild(messageReason);
+          messageReason.classList.add('p-4')
+          messageReason.innerHTML = marked.parse(reason); 
         }; 
         const save = async( ) => { 
             const content = messageContent.getAttribute('raw');
@@ -541,6 +579,7 @@
             if(!content && !images) return;
             await this.db.saveMessage({ id: msgId,  role: role, content: messageContent.getAttribute('raw'), timestamp: Date.now(), images: messageContent.getAttribute('images') });
         };
+        window.rup = updateReason;
         return {msgId, messageDiv, add, update, save, updateReason };
       }
 
@@ -608,6 +647,8 @@
           this.sendButton.disabled = false;
           this.sendIcon.classList.add('hidden');
           this.loadingIcon.classList.remove('hidden');
+          this.input.setAttribute('disabled', 'disabled');
+          this.imageUploadInput.setAttribute('disabled', 'disabled');
           
           return new Promise((resolve, reject) => {
             const message = { content: this.input.value, images: [...document.getElementById('image-preview-container').querySelectorAll('img')].map(x=>x.src) };
@@ -624,6 +665,9 @@
             // 恢复正常状态
             this.sendIcon.classList.remove('hidden');
             this.loadingIcon.classList.add('hidden');
+            this.input.removeAttribute('disabled');
+            this.imageUploadInput.removeAttribute('disabled');
+            this.input.focus();
             this.sendButton.disabled = !this.input.value.trim();
           });
         };
@@ -676,16 +720,38 @@
     }
 
     class AdvancedSettings {
+      static instance = null;
+      
+      static getInstance(db) {
+        if (!AdvancedSettings.instance) {
+          AdvancedSettings.instance = new AdvancedSettings(db);
+        } else if (db) {
+          // 如果已有实例但传入了新的db，则更新db
+          AdvancedSettings.instance.db = db;
+        }
+        return AdvancedSettings.instance;
+      }
+
       constructor(db) {
+        // 如果已经有实例，则直接返回该实例
+        if (AdvancedSettings.instance) {
+          return AdvancedSettings.instance;
+        }
+        
         this.db = db;
         this.settingsButton = document.getElementById('api-settings');
         this.saveButton = document.getElementById('save-settings');
         this.settingsModal = document.getElementById('settings-modal');
-        this.settings = {}
-        this.init()
+        this.settings = {};
+        this.initialized = false;
+        this.init();
+        
+        AdvancedSettings.instance = this;
       }
 
       async init() {
+        if (this.initialized) return;
+        
         this.settingsButton.addEventListener('click', this.open.bind(this));
         this.saveButton.addEventListener('click', this.save.bind(this));
         document.getElementById('temperature').addEventListener('input', (e) => {
@@ -694,6 +760,8 @@
         document.getElementById('topP').addEventListener('input', (e) => {
           document.getElementById('top-p-value').textContent = e.target.value;
         });
+        
+        this.initialized = true;
         await this.get();
       }
       
@@ -729,7 +797,7 @@
         const default_settings = {
             'apiKey': '', 'baseURL': 'https://text.pollinations.ai/openai','mcp':'',
             'model': 'openai', 'systemPrompt': '',
-            'temperature': 0.61, 'maxTokens': 128000, 'topP': 0.95
+            'temperature': 0.61, 'maxTokens': 8192, 'topP': 0.95
         }
         const saved_settings = (await this.db.getSettings()).reduce((acc, setting) => {acc[setting.key] = setting.value;return acc;}, {});
         this.settings = {...default_settings, ...saved_settings};
@@ -746,14 +814,22 @@
 
       async init() {
         if (!this.chatId) {
-          const chat = await window.MainDatabase.getOrCreateLastChat();
-          await window.conversations.loadConversation(chat.id);
-          return
+          if (localStorage.getItem('last_chat_id')) {
+            await window.conversations.loadConversation(parseInt(localStorage.getItem('last_chat_id')));
+            return
+          } else {
+            const chat = window.MainDatabase.getOrCreateLastChat();
+            await window.conversations.loadConversation(chat.id);
+            return
+          }
         }
+
         this.db = new ChatDatabase(this.chatId);
-        this.container = new AdvancedContainer(this.db);
+        // 使用单例模式获取容器实例
+        this.container = AdvancedContainer.getInstance(this.db);
         this.input = new AdvancedInput();
-        this.settings = new AdvancedSettings(this.db);
+        // 使用单例模式获取设置实例
+        this.settings = AdvancedSettings.getInstance(this.db);
         await this.settings.get();
 
         const messages = (await this.db.getAllMessages()).map(m => ({role:m.role, content:m.content}));
@@ -806,18 +882,46 @@
         await assistantMessage.update('',{spin:true});
       
         try {
+
           // 调用AI生成回复
           this.currentResponse = await this.ai.create(content.trim(), {images: images});
           let fullResponse = '';
+          let fullReasoning = ''
+
+          // 同时处理推理和内容流
+          await Promise.all([
+
+            // 实现同时处理内容流和推理流，上次有个人讽刺说openAI在推理流时不出内容流，而实际上确实没人这么做。这个实现无非是预留效果罢了。。。。。
+
+            // 处理推理流
+            (async() => {
+              console.log('reasoning.....');
+              for await (const reasoning_chunk of this.currentResponse.on('reasoning')) {
+                fullReasoning += reasoning_chunk.delta?.choices?.[0]?.delta?.reasoning || '';
+                await assistantMessage.updateReason(fullReasoning);
+              }
+              //为了不增加token，推理流不写入数据库
+            })(),
+            
+            // 处理内容流
+            (async ()=> {
+              for await (const chunk of this.currentResponse.on('content')) {
+                if (chunk.delta) {
+                  fullResponse += chunk.delta;
+                  await assistantMessage.update(fullResponse, true);
+                }
+              }
+              await assistantMessage.save();
+            })()
+
+          ])
           
-          // 处理流式响应
-          for await (const chunk of this.currentResponse.on('content')) {
-            if (chunk.delta) {
-              fullResponse += chunk.delta;
-              await assistantMessage.update(fullResponse, true);
-            }
-          }
-          await assistantMessage.save();
+          // 添加AI回复到消息历史
+          this.ai.messages.push({
+            role: 'assistant',
+            content: fullResponse
+          });
+          
           resolve(fullResponse);
         } catch (error) {
           await assistantMessage.update('抱歉，哪里出现了错误了。 请稍后再试。');
@@ -833,7 +937,7 @@
             langPrefix: 'hljs language-',
             highlight: function(code, lang) {
                 if (lang === 'mermaid') { return '<div class="mermaid">' + code + '</div>';}
-                const language = hljs.getLanguage(lang) ? lang : 'plaintext';
+                const language = hljs.getLanguage(lang) ? lang : 'plaintext'
                 return hljs.highlight(code, {language: language}).value;
             }
         }));
@@ -844,7 +948,12 @@
         await window.aiui.ready
 
         window.scrollTo(0, 1);
-        //document.body.requestFullscreen()
+        if (/()iPhone|iPad|iPod/.test(navigator.userAgent)) {
+            document.body.style.height = '100vh';
+            document.body.overflow = 'hidden';
+            document.body.requestFullscreen()
+        }
+
     });
   </script>
 </body>
